@@ -3,7 +3,7 @@ Variant: 2 — Message Status Tracking
 
 
 Part 1 — Component Diagram
-
+```mermaid
 graph TD
     ClientA[Client A / Sender] --> API[Backend API]
     ClientB[Client B / Receiver] <--> WS[WebSocket / Push Service]
@@ -22,6 +22,7 @@ graph TD
         DB
         Q
     end
+```
 
 
 Responsibilities:
@@ -39,7 +40,7 @@ Delivery Service: Відстежує наявність користувача �
 
 Part 2 — Sequence Diagram
 
-
+```mermaid
 sequenceDiagram
     participant A as User A (Client)
     participant API as API / Message Service
@@ -63,9 +64,9 @@ sequenceDiagram
     B->>API: POST /status-update (MessageID, Status: DELIVERED)
     API->>DB: Update Status to DELIVERED
     API->>A: Notify A via WebSocket (Status: DELIVERED)
-
+```
 Part 3 — State Diagram
-
+```mermaid
 stateDiagram-v2
     [*] --> Created: User clicks 'Send'
     Created --> Sent: Saved in DB
@@ -79,7 +80,7 @@ stateDiagram-v2
     
     Read --> [*]
 
-
+```
 Key Logic:
 Sent: Повідомлення успішно збережене в системі.
 
