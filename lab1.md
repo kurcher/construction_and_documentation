@@ -118,3 +118,9 @@ Consequences:
 + Reliability: Можливість реалізувати повторну відправку (Retry), якщо ack не отримано протягом певного часу.
 
 - Traffic: Невелике збільшення кількості запитів до API за рахунок окремих запитів на зміну статусу.
+
+- Key Questions Answered:
+Who updates message status? Бекенд (Message Service) на основі тригерів від Delivery Service (для Sent) та вхідних сигналів від Клієнта (для Delivered та Read).
+
+What happens if acknowledgements are missing?
+Система використовує механізм повторних спроб (Retry) у черзі повідомлень. Якщо статус не оновлюється до Delivered, повідомлення залишається в черзі або переміщується в Dead Letter Queue для подальшої обробки.
