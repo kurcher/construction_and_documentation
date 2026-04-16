@@ -119,7 +119,7 @@ Consequences:
 
 - Traffic: Невелике збільшення кількості запитів до API за рахунок окремих запитів на зміну статусу.
 
-- Key Questions Answered:
+Key Questions Answered:
 Who updates message status? Бекенд (Message Service) на основі тригерів від Delivery Service (для Sent) та вхідних сигналів від Клієнта (для Delivered та Read).
 
 What happens if acknowledgements are missing?
