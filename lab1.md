@@ -1,124 +1,119 @@
-# 🧪 Laboratory Work 1: Designing a Messaging System
+Laboratory Work 1: Designing a Messaging System
+Variant: 2 — Message Status Tracking
 
-**Variant 2:** Message Status Tracking
-**Author:** [Твоє Прізвище та Ім'я]
 
-## 🎯 Goal
-Learn how to design software systems before coding; reason about architecture and responsibilities; use Component, Sequence, and State diagrams; document decisions using RFC and ADR.
+Part 1 — Component Diagram
 
-## 🧠 Context
-This document outlines the architecture for a minimal messenger system with a specific focus on **message status tracking (sent, delivered, read)** and handling client acknowledgements.
-
----
-
-## 🧱 Part 1 — Component Diagram
-
-**Focus:** The system separates message processing from status tracking. The `Status Tracking Service` is introduced to handle the high volume of delivery and read acknowledgements without overloading the main `Message Service`.
-
-```mermaid
 graph TD
-    Client_A[Client A - Sender] <-->|WebSocket / REST| API[API Gateway]
-    Client_B[Client B - Receiver] <-->|WebSocket / REST| API
+    ClientA[Client A / Sender] --> API[Backend API]
+    ClientB[Client B / Receiver] <--> WS[WebSocket / Push Service]
     
     API --> Auth[Auth Service]
     API --> MS[Message Service]
-    API --> STS[Status Tracking Service]
     
-    MS -->|Save Message| DB[(Database)]
-    MS -->|Publish Deliver Event| MQ[Message Broker]
+    MS --> DB[(Messages DB)]
+    MS --> Q[Message Queue]
     
-    MQ -->|Push/WS to Client| Delivery[Delivery Service]
-    Delivery --> Client_B
+    Q --> DS[Delivery Service]
+    DS --> WS
+    DS --> MS
     
-    Client_B -.->|1. Send Delivery Ack| API
-    Client_B -.->|2. Send Read Ack| API
-    
-    STS -->|Update Status| DB
-    STS -->|Notify Sender| MQ
-    
-    MQ -->|Push/WS to Sender| Delivery
-    Delivery --> Client_A
+    subgraph "Infrastructure"
+        DB
+        Q
+    end
 
 
-Key Responsibilities:
-Status Tracking Service: Exclusively handles Delivery and Read acks from clients, updates the database, and triggers events to notify the sender.
+Responsibilities:
+Client: Надсилання повідомлень та відправка підтверджень (Acknowledgements) про отримання/прочитання.
 
-Message Broker (e.g., RabbitMQ/Kafka): Ensures reliable, asynchronous delivery of messages and status updates to the Delivery Service.
+Backend API: Валідація запитів, аутентифікація та проксіювання до бізнес-логіки.
 
-Delivery Service (WebSocket / Push): Manages real-time connections with online clients and delegates to APNs/FCM for offline clients.
+Message Service: Збереження повідомлень у БД та управління станами (sent, delivered, read).
 
-🔁 Part 2 — Sequence Diagram
-Scenario: A complete message lifecycle. User A sends a message to User B. The diagram shows how the system updates statuses at each stage: Sent -> Delivered -> Read.
+Message Queue: Асинхронний буфер для гарантованої доставки повідомлень.
 
-Фрагмент коду
+Delivery Service: Відстежує наявність користувача в мережі та передає дані через WebSocket або Push-сповіщення.
+
+
+
+Part 2 — Sequence Diagram
+
+
 sequenceDiagram
-    actor A as Client A (Sender)
-    participant API as API Gateway
+    participant A as User A (Client)
+    participant API as API / Message Service
     participant DB as Database
-    participant MQ as Message Queue
-    actor B as Client B (Receiver)
+    participant Q as Message Queue
+    participant DS as Delivery Service
+    participant B as User B (Client)
 
-    Note over A, API: 1. Status: SENT (1 Tick)
-    A->>API: POST /messages {text: "Hello!", msgId: "uuid-1"}
-    API->>DB: Save {msgId: "uuid-1", status: "Sent"}
-    API-->>A: 200 OK (Ack: Sent)
-    API->>MQ: Enqueue: Deliver msgId "uuid-1" to B
+    Note over A, B: User B is Offline
+    A->>API: POST /messages (content, recipient_id)
+    API->>DB: Save Message (Status: SENT)
+    API->>Q: Enqueue Message Delivery
+    API-->>A: 202 Accepted (Message ID)
 
-    Note over MQ, B: 2. Status: DELIVERED (2 Grey Ticks)
-    MQ->>B: Push/WS Message {msgId: "uuid-1"}
-    B->>API: POST /acks {msgId: "uuid-1", type: "Delivered"}
-    API->>DB: Update {msgId: "uuid-1", status: "Delivered"}
-    API->>MQ: Enqueue: Notify A -> msgId "uuid-1" Delivered
-    MQ->>A: Push/WS Event: Status Update (Delivered)
+    Note over B, DS: User B comes Online
+    B->>DS: Connect (WebSocket)
+    DS->>Q: Consume Pending Messages
+    Q-->>DS: Message Data
+    DS->>B: Push Message (Deliver)
+    
+    B->>API: POST /status-update (MessageID, Status: DELIVERED)
+    API->>DB: Update Status to DELIVERED
+    API->>A: Notify A via WebSocket (Status: DELIVERED)
 
-    Note over B, API: 3. Status: READ (2 Blue Ticks)
-    B->>B: User opens chat
-    B->>API: POST /acks {msgId: "uuid-1", type: "Read"}
-    API->>DB: Update {msgId: "uuid-1", status: "Read"}
-    API->>MQ: Enqueue: Notify A -> msgId "uuid-1" Read
-    MQ->>A: Push/WS Event: Status Update (Read)
-🔄 Part 3 — State Diagram
-Object: Message Lifecycle.
-This state machine includes error handling for network issues between the client and the server.
+Part 3 — State Diagram
 
-Фрагмент коду
 stateDiagram-v2
-    [*] --> Draft: User starts typing
-    Draft --> Sending: User clicks "Send"
+    [*] --> Created: User clicks 'Send'
+    Created --> Sent: Saved in DB
     
-    Sending --> Failed: Network Error / Timeout
-    Failed --> Sending: User clicks "Retry"
+    Sent --> Delivered: Client B receives & acknowledges
+    Sent --> Failed: TTL expired / Delivery error
     
-    Sending --> Sent: Received & Saved by Server
+    Failed --> Sent: Retry logic
     
-    Sent --> Delivered: Delivery Ack Received from Receiver
-    
-    Delivered --> Read: Read Ack Received from Receiver
+    Delivered --> Read: Client B opens chat & acknowledges
     
     Read --> [*]
-📚 Part 4 — ADR (Architecture Decision Record)
-# ADR-001: Implementing "At-Least-Once" Delivery with Idempotency for Acknowledgements
-Status
-Accepted
 
-Context
-In mobile networks, connections drop frequently. If the server delivers a message to Client B, but Client B loses connection before sending a Delivery Ack, the sender will incorrectly see the status as merely Sent. Furthermore, if the server retries sending the message, Client B might receive duplicates.
 
-Decision
-We will use an At-Least-Once delivery guarantee combined with Client-Side Idempotency:
+Key Logic:
+Sent: Повідомлення успішно збережене в системі.
 
-Server Retries: If the Status Tracking Service does not receive a Delivery Ack within a specified timeout (e.g., 60 seconds for active WebSocket connections), the message broker will re-queue the message for delivery.
+Delivered: Клієнтський додаток отримувача отримав пакет даних і автоматично надіслав ack.
 
-Idempotency Keys: Every message is generated with a unique UUID by the sender. If the receiver gets a message with an already processed UUID, it silently ignores the payload but resends the Delivery Ack.
+Read: Користувач-отримувач відкрив вікно чату (trigger event), що ініціює фінальне оновлення статусу.
 
-Offline Sync: Upon reconnecting, clients pull a list of missed messages and push an array (batch) of pending Acks that failed to send while offline.
 
-Alternatives
-Fire-and-Forget (Rejected): The server assumes the message is delivered the moment it is pushed to the WebSocket. This leads to inaccurate statuses if the connection drops mid-flight.
+Part 4 — ADR (Architecture Decision Record)
 
-Exactly-Once Delivery (Rejected): Too complex and computationally expensive to implement reliably in a distributed mobile system.
 
-Consequences
-Positive: High reliability in status tracking. Messages are never "stuck" in the Sent state if they were actually delivered. No duplicated messages shown to the user.
+# ADR-002: Client-Side Acknowledgement for Status Updates
+Status: Accepted
 
-Negative: Increased complexity on the client side (needs local database to store processed UUIDs and queues for unsent Acks). Slight increase in network payload due to retry mechanisms.
+Context:
+У системі з обміном повідомленнями критично важливо точно знати, чи дійшло повідомлення до пристрою (Delivered) та чи побачив його користувач (Read). Мережеві з'єднання можуть бути нестабільними, тому сервер не може вважати повідомлення "доставленим" просто за фактом відправки в сокет.
+
+Decision:
+Ми впроваджуємо систему підтверджень на рівні клієнта (Application-level ACKs).
+
+Статус Delivered встановлюється лише тоді, коли пристрій отримувача надсилає сигнал підтвердження після успішного отримання даних.
+
+Статус Read ініціюється виключно дією користувача (відкриття чату) на фронтенді.
+
+Alternatives:
+
+Server-side Assumption (Rejected): Вважати доставленим, як тільки дані пішли в TCP-канал. Ризиковано, бо додаток на девайсі міг "впасти" до того, як зберіг повідомлення.
+
+Polling (Rejected): Клієнт постійно запитує нові повідомлення. Це занадто навантажує батарею мобільних пристроїв та сервер.
+
+Consequences:
+
++ Accuracy: Точне відображення стану повідомлення для відправника.
+
++ Reliability: Можливість реалізувати повторну відправку (Retry), якщо ack не отримано протягом певного часу.
+
+- Traffic: Невелике збільшення кількості запитів до API за рахунок окремих запитів на зміну статусу.
