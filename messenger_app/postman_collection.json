@@ -1,0 +1,53 @@
+{
+	"info": {
+		"_postman_id": "e4b52b31-3c99-4c21-9e2a-1b1234567890",
+		"name": "Messenger API - Lab 2",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Create User A",
+			"request": {
+				"method": "POST",
+				"header": ["Content-Type: application/json"],
+				"body": { "mode": "raw", "raw": "{\"name\": \"Alice\"}" },
+				"url": { "raw": "http://127.0.0.1:8000/users", "protocol": "http", "host": ["127", "0", "0", "1"], "port": "8000", "path": ["users"] }
+			}
+		},
+		{
+			"name": "2. Create Conversation",
+			"request": {
+				"method": "POST",
+				"header": ["Content-Type: application/json"],
+				"body": { "mode": "raw", "raw": "{\"type\": \"direct\"}" },
+				"url": { "raw": "http://127.0.0.1:8000/conversations", "protocol": "http", "host": ["127", "0", "0", "1"], "port": "8000", "path": ["conversations"] }
+			}
+		},
+		{
+			"name": "3. Send Message",
+			"request": {
+				"method": "POST",
+				"header": ["Content-Type: application/json"],
+				"body": { "mode": "raw", "raw": "{\"conversation_id\": 1, \"sender_id\": 1, \"text\": \"Hello Status Tracking Architecture!\"}" },
+				"url": { "raw": "http://127.0.0.1:8000/messages", "protocol": "http", "host": ["127", "0", "0", "1"], "port": "8000", "path": ["messages"] }
+			}
+		},
+		{
+			"name": "4. Get Messages History",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": { "raw": "http://127.0.0.1:8000/conversations/1/messages", "protocol": "http", "host": ["127", "0", "0", "1"], "port": "8000", "path": ["conversations", "1", "messages"] }
+			}
+		},
+		{
+			"name": "5. Update Message Status (ACK)",
+			"request": {
+				"method": "PATCH",
+				"header": ["Content-Type: application/json"],
+				"body": { "mode": "raw", "raw": "{\"status\": \"delivered\"}" },
+				"url": { "raw": "http://127.0.0.1:8000/messages/1/status", "protocol": "http", "host": ["127", "0", "0", "1"], "port": "8000", "path": ["messages", "1", "status"] }
+			}
+		}
+	]
+}
